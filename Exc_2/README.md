@@ -3,7 +3,7 @@
 This exercise we're going to implement a REST server in Golang with Chi, that exposes the following routes:
 
 - GET `/api/menu`
-  - Returns a slice (array) of menus
+  - Returns a slice (array) of drinks
 - GET `/api/order/all`
   - Returns a slice of orders
 - GET `/api/order/totalled`
