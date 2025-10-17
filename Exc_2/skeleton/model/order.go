@@ -1,7 +1,11 @@
 package model
 
+import "time"
+
+// Order represents a customer's drink order.
 type Order struct {
-	DrinkID uint64 `json:"drink_id"` // foreign key
-	// todo Add fields: CreatedAt (time.Time), Amount with suitable types
-	// todo json attributes need to be snakecase, i.e. name, created_at, my_variable, ..
+	ID        uint64    `json:"id"`
+	DrinkID   uint64    `json:"drink_id"`
+	Amount    int       `json:"amount"`
+	CreatedAt time.Time `json:"created_at"`
 }
