@@ -1,0 +1,99 @@
+# Docker Compose for Exercise 4 (folder: Exc_4/skeleton)
+# Goal: run PostgreSQL (db) + Go orderservice (app) on one shared bridge network,
+#       with health checks, persistent storage, and explicit environment configuration.
+# Presenter note: Compose reads this file and orchestrates both containers together.
+
+# A readable project name; Compose prefixes created resources (networks, volumes, images).
+# Presenter note: Using a unique name avoids clashes if you have other Compose projects running.
+name: ordersystem-ex4
+
+# All container definitions live under "services".
+services:
+
+  
+  # PostgreSQL database (db)
+  postgres:
+    # Official Postgres image; pin a major/minor version for reproducible builds.
+    image: postgres:16
+
+    # Ensure the database comes back after host reboots unless you intentionally stop it.
+    restart: unless-stopped
+
+    # Expose the database on the host so local clients (psql, DBeaver) can connect.
+    # Format "HOST:CONTAINER".
+    ports:
+      - "5432:5432"
+
+    # Core configuration for Postgres. Values resolve from .env if present; otherwise defaults apply.
+    # Presenter note: Keeping creds in envs lets the same compose file work on any machine.
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-order}                 # logical DB name created at first start
+      POSTGRES_USER: ${POSTGRES_USER:-docker}            # superuser to own the DB
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-docker}    # superuser password
+      POSTGRES_TCP_PORT: ${POSTGRES_TCP_PORT:-5432}      # not commonly changed; here for completeness
+
+    # Persist database files so "docker compose down" doesn’t erase your data.
+    # Presenter note: Named volumes are managed by Docker; no host-path assumptions.
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+    # Healthcheck: Compose will wait for this to turn "healthy" before starting dependent services.
+    # Presenter tip: $$ escapes $ inside YAML so the container sees $POSTGRES_USER.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+    # Attach DB to the same network as the app so they can resolve each other by service name.
+    networks:
+      - ordersystem-ex4-net
+
+  # Go orderservice (app)
+  orderservice:
+    # Build an image for the app from the Dockerfile in THIS folder.
+    build:
+      # Build context is the current directory (Exc_4/skeleton).
+      # Presenter note: Context = what gets sent to the Docker daemon for building.
+      context: .
+      # Use the Dockerfile that sits beside this compose file.
+      dockerfile: ./Dockerfile
+
+    # Don’t start the app until Postgres is healthy (per healthcheck above).
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    # Publish the HTTP API out to your host.
+    ports:
+      - "3000:3000"          # visit http://localhost:3000
+
+    # Inject environment variables from a local .env file next to this compose file.
+    # Presenter note: This prevents hard-coding secrets in the compose file.
+    env_file:
+      - ./.env
+
+    # Extra runtime envs. Inside the Docker network, "postgres" is the hostname (service name).
+    environment:
+      DB_HOST: postgres
+
+    # Command to start the compiled Go binary inside the container.
+    # Presenter note: this must match the binary path created by your Dockerfile build stage.
+    command: ["/app/orderservice"]
+
+    # Connect app to the same network as the DB.
+    networks:
+      - ordersystem-ex4-net
+
+
+# Networking
+# Create a user-defined bridge network for this stack.
+# Presenter note: Using a unique name avoids conflicts with pre-existing networks (e.g., sbd3-net).
+networks:
+  ordersystem-ex4-net:
+    name: ordersystem-ex4-net
+
+# Persistent storage
+# Named volume for Postgres data files so they survive container rebuilds.
+volumes:
+  pgdata:
