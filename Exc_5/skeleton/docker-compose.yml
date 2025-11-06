@@ -45,7 +45,7 @@ services:
     networks:
       - intercom
     volumes:
-      - order_pg_vol:/var/lib/postgresql/data
+      - order_pg_vol:/var/lib/postgresql/18/docker
     ports:
       - "5432:5432"
     environment:
