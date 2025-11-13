@@ -1,0 +1,84 @@
+networks:
+  web:
+    name: web          # network used for things that go through Traefik (browser traffic)
+  intercom:
+    name: intercom     # internal network between orderservice and Postgres
+
+volumes:
+  order_pg_vol:        # named volume so the database data is not lost when containers stop
+
+services:
+  traefik:
+    image: "traefik:v3.5.2"
+    restart: unless-stopped
+    command:
+      - "--providers.docker=true"               # let Traefik auto-detect services from Docker labels
+      - "--api.insecure=true"                   # enable the dashboard (insecure, for local dev)
+      - "--providers.docker.exposedbydefault=false"  # do NOT expose containers unless we explicitly enable them
+      - "--entrypoints.web.address=:80"         # Traefik listens on port 80 (normal HTTP)
+      - "--log.level=DEBUG"                      # enable DEBUG logging for detailed diagnostics
+    ports:
+      - "80:80"                                 # expose Traefik port 80 from container to host
+      - "8080:8080"                             # Traefik dashboard (local dev)
+    # Docker socket mapping - Docker Desktop on Windows still uses Linux VM socket
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - web
+
+  orderservice:
+    container_name: orderservice
+    build: .                                     # build the Go orderservice from the Dockerfile in this folder
+    command: [ "/app/ordersystem" ]              # start the compiled Go binary
+    # todo add traefik labels  ->  these labels tell Traefik how to reach this service
+    labels:
+      - "traefik.enable=true"                    # make this container visible to Traefik
+      - "traefik.docker.network=web"             # Traefik should talk to it over the 'web' network
+      - "traefik.http.routers.orders.rule=Host(`orders.localhost`) && PathPrefix(`/api`)"  # route /api/* to the orderservice
+      - "traefik.http.routers.orders.entrypoints=web"                # use the web (port 80) entrypoint
+      - "traefik.http.routers.orders.priority=100"                   # ensure API routing has higher priority than the static site
+      - "traefik.http.services.orders.loadbalancer.server.port=3000" # inside container the app listens on port 3000
+    environment:
+      - POSTGRES_DB=order
+      - POSTGRES_USER=docker
+      - POSTGRES_PASSWORD=docker
+      - POSTGRES_TCP_PORT=5432
+      - DB_HOST=order-postgres                   # hostname of the Postgres container (same as its service name)
+    networks:
+      - intercom                                 # internal network to talk to the database
+      - web                                      # web network so Traefik can reach it
+    depends_on:
+      - order-postgres                           # start Postgres before orderservice
+
+  sws:
+    image: joseluisq/static-web-server:latest
+    restart: unless-stopped
+    volumes:
+      - ../solution/frontend:/public:ro          # serve files from ../solution/frontend as /public inside the container
+    environment:
+      - SERVER_PORT=80                           # SWS listens on port 80 inside the container
+      - SERVER_ROOT=/public                      # SWS should serve files from /public
+    labels:
+      - "traefik.enable=true"                    # expose SWS to Traefik
+      - "traefik.docker.network=web"             # Traefik talks to it on the 'web' network
+      - "traefik.http.routers.sws.rule=Host(`localhost`) || Host(`orders.localhost`)"   # open it under http://localhost and http://orders.localhost
+      - "traefik.http.routers.sws.entrypoints=web"          # use the port 80 entrypoint
+      - "traefik.http.middlewares.sws-replacepath.replacepath.path=/" # rewrite unmatched paths to root index
+      - "traefik.http.routers.sws.middlewares=sws-replacepath@docker"
+      - "traefik.http.services.sws.loadbalancer.server.port=80" # inside container SWS is on port 80
+    networks:
+      - web                                      # only needs to be reachable from Traefik / browser
+
+  order-postgres:
+    image: postgres:16
+    container_name: order-postgres
+    restart: always
+    networks:
+      - intercom                                 # only internal network (no direct web access)
+    volumes:
+      - order_pg_vol:/var/lib/postgresql/data    # store database files in the named volume
+    environment:
+      - POSTGRES_DB=order
+      - POSTGRES_USER=docker
+      - POSTGRES_PASSWORD=docker
+      - POSTGRES_TCP_PORT=5432
