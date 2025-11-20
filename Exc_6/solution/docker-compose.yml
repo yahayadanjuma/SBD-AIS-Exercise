@@ -1,0 +1,97 @@
+networks:
+  web:
+    name: web
+  intercom:
+    name: intercom
+
+volumes:
+  order_pg_vol:      # volume to persist postgres database data
+  order_s3_vol:      # new volume for minio so receipts/files are not lost when containers restart
+
+services:
+  traefik:
+    image: "traefik:v3.5.2"
+    security_opt:
+      - no-new-privileges:true
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=web"
+      - "--entryPoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      # Add Docker as a mounted volume, so that Traefik can read the labels of other services
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    networks:
+      - web
+
+  orderservice:
+    build: .
+    restart: unless-stopped
+    command: [ "/app/ordersystem" ]
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.orders.rule=Host(`orders.localhost`)"
+      - "traefik.http.routers.orders.entrypoints=web"
+      - "traefik.http.services.orders.loadbalancer.server.port=3000"
+    environment:
+      - POSTGRES_DB=order
+      - POSTGRES_USER=docker
+      - POSTGRES_PASSWORD=docker
+      - PGPORT=5555
+      - DB_HOST=order-postgres
+      - S3_ACCESS_KEY_ID=root           # access key that matches MINIO_ROOT_USER so orderservice can talk to minio
+      - S3_SECRET_ACCESS_KEY=verysecret # secret key that matches MINIO_ROOT_PASSWORD for authentication
+      - S3_ENDPOINT=order-minio:8500    # internal endpoint (service name + port) that orderservice uses for S3 API
+    networks:
+      - intercom
+      - web
+    ports:
+      - "3000:3000"
+
+  sws:
+    image: joseluisq/static-web-server:latest
+    environment:
+      - SERVER_PORT=80
+      - SERVER_ROOT=/public
+    volumes:
+      - ./frontend:/public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sws.rule=Host(`localhost`)"
+      - "traefik.http.routers.sws.entrypoints=web"
+    networks:
+      - intercom
+      - web
+
+  order-postgres:
+    image: postgres:18
+    volumes:
+      - order_pg_vol:/var/lib/postgresql   # bind postgres data directory to named volume
+    restart: always
+    networks:
+      - intercom
+    ports:
+      - "5555:5555"
+    environment:
+      - POSTGRES_DB=order
+      - POSTGRES_USER=docker
+      - POSTGRES_PASSWORD=docker
+      - PGPORT=5555
+
+  order-minio:
+    image: minio/minio:latest                      # minio image gives us a local S3-compatible object storage
+    restart: unless-stopped                        # keep minio running unless I explicitly stop the container
+    command: ["server", "--address", ":8500", "--console-address", ":9001", "/data"] # run minio server on port 8500 and WebUI on 9001
+    environment:
+      - MINIO_ROOT_USER=root                       # root user for logging into minio and for S3 credentials
+      - MINIO_ROOT_PASSWORD=verysecret             # root password, kept simple here to match orderservice env vars
+    volumes:
+      - order_s3_vol:/data                         # mount our named volume so uploaded receipts are stored persistently
+    networks:
+      - intercom                                   # only backend services (orderservice) need direct access to minio
+    ports:
+      - "8500:8500"                                # expose minio API on localhost:8500
+      - "9001:9001"                                # expose minio WebUI on localhost:9001

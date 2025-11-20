@@ -76,7 +76,9 @@ services:
     networks:
       - intercom                                 # only internal network (no direct web access)
     volumes:
-      - order_pg_vol:/var/lib/postgresql/data    # store database files in the named volume
+      - order_pg_vol:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     environment:
       - POSTGRES_DB=order
       - POSTGRES_USER=docker

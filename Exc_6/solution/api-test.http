@@ -1,0 +1,17 @@
+### Get all drinks
+GET http://localhost:3000/api/menu
+
+### Post a new order
+POST http://localhost:3000/api/order
+Content-Type: application/json
+
+{
+  "drink_id": 2,
+  "amount": 3
+}
+
+### Get all orders
+GET http://localhost:3000/api/order/all
+
+### Get a receipt for order 1
+GET http://localhost:3000/api/receipt/1
