@@ -3,7 +3,6 @@
 This exercise focuses on containerization of software.
 We are going to put the HTTP server from Exercise 2
 into a Docker container, using a multi-stage Dockerfile.
-
 We are also going to add a PostgreSQL database to this project.
 The database shall be started as a docker container.
 
