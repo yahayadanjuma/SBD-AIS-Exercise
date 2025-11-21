@@ -58,6 +58,10 @@ How to deploy and setup a Docker Swarm cluster:
 Adding secrets to the docker-compose file:
 - https://docs.docker.com/compose/how-tos/use-secrets/
 
+Docker Swarm on Windows (beware, the tutorial uses Windows Containers):
+- https://learn.microsoft.com/en-us/virtualization/windowscontainers/manage-containers/swarm-mode
+- https://www.youtube.com/watch?v=ZfMV5JmkWCY&t=170s
+
 Beware that service labels in Docker Swarm need to be placed after the deploy section!
 ```yml
 deploy:
