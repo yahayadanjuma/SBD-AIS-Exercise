@@ -79,3 +79,7 @@ deploy:
 - `docker stack deploy -c <docker-compose.swarm.yml> <name-of-stack>` Deploy a stack to the cluster OR update current cluster with new configuration
 - `docker stack rm <name-of-stack>` Delete stack, equivalent to docker-compose down
 - `docker service ps <service-name> (--no-trunc)`  List tasks services, useful to debug failing services
+
+## Windows Struggles
+If you can't ping each other, your Windows is probably blocking ICMP Echo Requests. 
+Have a look here: https://superuser.com/questions/1683853/cannot-ping-a-windows-11-machine
