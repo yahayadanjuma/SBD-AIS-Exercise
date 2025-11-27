@@ -1,0 +1,2 @@
+# todo note commands
+I wasn’t able to set up Docker Swarm across multiple computers, so I went with a single-node setup as mentioned in the email. I started the cluster using "docker swarm init" and deployed everything with "docker stack deploy -c docker-compose.yml mystack"
