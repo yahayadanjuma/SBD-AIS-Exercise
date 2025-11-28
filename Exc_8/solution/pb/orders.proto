@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+import "google/protobuf/wrappers.proto";
+import "google/protobuf/empty.proto";
+
+option go_package = "exc8/pb";
+
+package models;
+
+// A drink that can be ordered
+message Drink {
+  int32 id = 1;
+  string name = 2;
+  int32 price = 3;
+  string description = 4;
+}
+
+// Response for GetDrinks: list of all drinks
+message ListDrinksResponse {
+  repeated Drink drinks = 1;
+}
+
+// Request for OrderDrink
+message OrderDrinkRequest {
+  int32 drink_id = 1;
+  int32 amount = 2;
+}
+
+// Response for OrderDrink
+message OrderDrinkResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Single order line (used in GetOrdersResponse)
+message Order {
+  int32 drink_id = 1;
+  int32 amount = 2;
+}
+
+// Response for GetOrders: aggregated totals per drink
+message GetOrdersResponse {
+  repeated Order orders = 1;
+}
+
+// Define the service
+service OrderService {
+  // List all available drinks
+  rpc GetDrinks (google.protobuf.Empty) returns (ListDrinksResponse);
+
+  // Place an order for a drink
+  rpc OrderDrink (OrderDrinkRequest) returns (OrderDrinkResponse);
+
+  // Get total ordered amount per drink
+  rpc GetOrders (google.protobuf.Empty) returns (GetOrdersResponse);
+}
